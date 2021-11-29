@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      MARIADB_ROOT_PASSWORD: password
+
+  postgres:
+    image: postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: password
+
+  mongo:
+    image: mongo:5
+    environment:
+      MONGO_INITDB_DATABASE: app_db
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/var/lib/mongo/db
+    ports:
+      - 27017:27017
+      - 9229:9229
+
+  portainer:
+    image: portainer/portainer-ce
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    ports:
+      - 9000:9000
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - 6379:6379
+
+  smtp:
+    image: reachfive/fake-smtp-server
+    ports:
+      - 1025:1025
+      - 1080:1080
+
+volumes:
+  pg_data:
+  mariadb_data:
+  portainer_data:
+  redis_data:
+  mongo_data:
