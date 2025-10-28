@@ -1,61 +1,168 @@
-version: "3.8"
+version: "3.9"
 
 services:
   mariadb:
-    image: mariadb:10
+    image: mariadb:11.4
+    container_name: mariadb
     volumes:
       - mariadb_data:/var/lib/mysql
-    command: --max_allowed_packet=32505856
+      - ./init-scripts/mariadb:/docker-entrypoint-initdb.d
+    command: --max_allowed_packet=32505856 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
     ports:
-      - 3306:3306
+      - "3306:3306"
     environment:
       MARIADB_ROOT_PASSWORD: password
+      MARIADB_USER: dev
+      MARIADB_PASSWORD: dev123
+      MARIADB_DATABASE: app_db
+    networks:
+      - dev-network
 
   postgres:
-    image: postgres
+    image: postgres:16-alpine
+    container_name: postgres
     volumes:
       - pg_data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d
+    restart: unless-stopped
     ports:
-      - 5432:5432
+      - "5432:5432"
     environment:
       POSTGRES_PASSWORD: password
+      POSTGRES_USER: dev
+      POSTGRES_DB: app_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    networks:
+      - dev-network
 
   mongo:
-    image: mongo:5
+    image: mongo:7.0
+    container_name: mongo
     environment:
       MONGO_INITDB_DATABASE: app_db
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
-      - mongo_data:/var/lib/mongo/db
+      - mongo_data:/data/db
+      - ./init-scripts/mongo:/docker-entrypoint-initdb.d
+    restart: unless-stopped
     ports:
-      - 27017:27017
-      - 9229:9229
+      - "27017:27017"
+    networks:
+      - dev-network
 
   portainer:
-    image: portainer/portainer-ce
+    image: portainer/portainer-ce:2.21.1-alpine
+    container_name: portainer
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
+    restart: unless-stopped
     ports:
-      - 9000:9000
+      - "9000:9000"
+    networks:
+      - dev-network
 
   redis:
-    image: redis:alpine
+    image: redis:7.2-alpine
+    container_name: redis
     volumes:
       - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
     ports:
-      - 6379:6379
+      - "6379:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - dev-network
 
   smtp:
-    image: reachfive/fake-smtp-server
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
     ports:
-      - 1025:1025
-      - 1080:1080
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - dev-network
+
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - dev-network
+    depends_on:
+      - mariadb
+      - postgres
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - dev-network
+    depends_on:
+      - postgres
+
+  mongodb-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://root:password@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: dev
+      ME_CONFIG_BASICAUTH_PASSWORD: dev123
+    networks:
+      - dev-network
+    depends_on:
+      - mongo
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - dev-network
+    depends_on:
+      - redis
 
 volumes:
   pg_data:
+    driver: local
   mariadb_data:
+    driver: local
   portainer_data:
+    driver: local
   redis_data:
+    driver: local
   mongo_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  dev-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
