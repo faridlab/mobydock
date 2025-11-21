@@ -68,7 +68,44 @@ services:
     profiles:
       - admin
 
-  # Development database (lightweight alternatives)
+  # Development databases
+  mongo:
+    image: mongo:7.0
+    container_name: mongo-dev
+    environment:
+      MONGO_INITDB_DATABASE: app_db
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+      - ./init-scripts/mongo:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    networks:
+      - dev-network
+    profiles:
+      - mongo
+
+  mongodb-express:
+    image: mongo-express:latest
+    container_name: mongo-express-dev
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://root:password@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: root
+      ME_CONFIG_BASICAUTH_PASSWORD: password
+    networks:
+      - dev-network
+    depends_on:
+      - mongo
+    profiles:
+      - mongo
+
   sqlite:
     image: nouchka/sqlite3:latest
     container_name: sqlite-dev
@@ -165,6 +202,8 @@ services:
 
 volumes:
   node_modules:
+    driver: local
+  mongo_data:
     driver: local
   sqlite_data:
     driver: local
